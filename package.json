@@ -1,0 +1,22 @@
+{
+  "name": "bookish2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon ./server/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "core-util-is": "^1.0.2",
+    "dotenv": "^8.2.0",
+    "express": "^4.15.2",
+    "faker": "^4.1.0",
+    "mysql": "^2.13.0",
+    "nodemon": "^2.0.4"
+  }
+}
