@@ -1,63 +1,103 @@
 const { Router } = require("express");
+const { validationResult } = require("express-validator");
+const { QueryTypes } = require("sequelize");
+
+const { Book, Author, Borrowed_Book, Admin } = require("../../models/tables");
+const database = require("../../config/database");
+const {
+  ADMIN_LOGIN_VALIDATION,
+} = require("../../utils/expressValidator/routesValidator");
+const {
+  generateErrorsArray,
+} = require("../../utils/expressValidator/helperFunctions");
 
 let router = Router();
 
-const getRoutes = (database) => {
-  router.get("/books", (req, res) => {
-    database.query("SELECT * FROM books", (err, results) => {
-      if (err) throw new Error(err);
-      res.send({ ...results });
+router.get("/admin", ADMIN_LOGIN_VALIDATION, (req, res) => {
+  let errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    let errorsArray = generateErrorsArray(errors);
+    return res.status(422).send(errorsArray);
+  }
+
+  let filter = req.query.email
+    ? { email: req.query.email }
+    : { id: req.query.id };
+
+  Admin.findOne({ where: filter }).then((result) => {
+    res.status(200).json({ user: result });
+  });
+});
+
+router.get("/authors", (req, res) => {
+  let { id } = req.query;
+  let filter = {};
+
+  if (id && Number(id)) {
+    filter = { where: { id: id }, include: Book };
+  }
+  Author.findAll(filter).then((result) => {
+    res.status(200).send(result);
+  });
+});
+
+router.get("/authors/search/:query", async (req, res) => {
+  const { query } = req.params;
+  database
+    .query(
+      "SELECT * FROM authors WHERE INSTR(author_name,:userQuery) ORDER BY INSTR(author_name,:userQuery)",
+      { replacements: { userQuery: query }, type: QueryTypes.SELECT }
+    )
+    .then((authors) => {
+      res.status(200).send(authors);
     });
-  });
+});
 
-  router.get("/books/author/:author_id", (req, res) => {
-    const { author_id } = req.params;
+router.get("/books", (req, res) => {
+  let { id } = req.query;
 
-    database.query(
-      "SELECT * FROM books WHERE author_id=?",
-      author_id,
-      (err, results) => {
-        if (err) throw err;
+  let filter = {};
 
-        if (results.length) {
-          res.send({ ...results });
-        } else {
-          res
-            .status(400)
-            .send({ error: `Error, Author ID ${author_id} doesn't exist` });
-        }
-      }
-    );
-  });
+  if (id && Number(id)) {
+    filter = { where: { id: id }, include: Author };
+  }
 
-  router.get("/authors", (req, res) => {
-    database.query("SELECT * FROM authors", (err, results) => {
-      if (err) throw new Error(err);
-      res.send({ ...results });
-    });
-  });
+  Book.findAll(filter)
+    .then((results) => {
+      res.status(200).send({ results });
+    })
+    .catch((err) => console.log(err));
+});
 
-  router.get("/authors/author/:author_id", (req, res) => {
-    const { author_id } = req.params;
+router.get("/books/search/:query", async (req, res) => {
+  const { query } = req.params;
 
-    database.query(
-      "SELECT * FROM authors WHERE id=?",
-      author_id,
-      (err, results) => {
-        if (err) throw err;
+  let matchedBooks = await database.query(
+    "SELECT * FROM books JOIN authors ON authors.id=books.author_id WHERE INSTR(title,:userQuery) ORDER BY INSTR(title,:userQuery), LENGTH(title)",
+    {
+      replacements: { userQuery: query },
+      type: QueryTypes.SELECT,
+      exclude: ["id", "author_id"],
+    }
+  );
+  matchedBooks
+    ? res.status(200).json({ results: matchedBooks })
+    : res.status(400).json({ results: [] });
+});
 
-        if (results.length) {
-          res.send({ ...results });
-        } else {
-          res
-            .status(400)
-            .send({ error: `Error, Author ID ${author_id} doesn't exist` });
-        }
-      }
-    );
-  });
+router.get("/borrowed-books", (req, res) => {
+  let { member_id } = req.query;
 
-  return router;
-};
+  let filter = { where: { return_date: null } };
 
-module.exports = getRoutes;
+  if (member_id) {
+    filter = { where: { return_date: null, member_id } }; // will include their books too
+  }
+  Borrowed_Book.findAll(filter)
+    .then((results) => {
+      res.status(200).send(results);
+    })
+    .catch((err) => res.status(400).send(err));
+});
+
+module.exports = router;

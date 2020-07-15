@@ -9,8 +9,8 @@ const config = {
   },
   db: {
     host: DB_HOST,
-    user: DB_USER,
-    database: DB_NAME,
+    username: DB_USER,
+    database_name: DB_NAME,
     password: DB_PASSWORD,
   },
 };
